@@ -5,15 +5,18 @@
 # The prompt grounds the LLM in REAL survey statistics loaded from data/,
 # so answers reflect the doctoral fieldwork rather than generic text.
 #
-# NOTE: verify the Gemini endpoint/model name against current Google docs
-# (ai.google.dev) — API details can change. Never hardcode or commit a key.
+# NOTE: verify model names against current Google docs (ai.google.dev) —
+# API details can change. Never hardcode or commit a key.
 
 import json
 import pandas as pd
 import requests
 
-GEMINI_URL = ("https://generativelanguage.googleapis.com/v1beta/models/"
-              "gemini-1.5-flash:generateContent")
+# Candidate model names, tried in order. Google retires model names over
+# time, so if all fail, check current names at ai.google.dev and edit this list.
+GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+GEMINI_URL_TMPL = ("https://generativelanguage.googleapis.com/v1beta/models/"
+                   "{model}:generateContent")
 
 def survey_context() -> str:
     """Build a short factual context block from the real survey data,
@@ -75,14 +78,19 @@ In under 150 words, in English: (1) classify the complaint (foundational vs
 digital-layer), (2) recommend a budget-priority action consistent with the
 framework, (3) reference the survey evidence where relevant. Be concrete and
 policy-oriented. Do not invent statistics beyond those provided."""
-    resp = requests.post(
-        GEMINI_URL,
-        params={"key": api_key},
-        json={"contents": [{"parts": [{"text": prompt}]}]},
-        timeout=30,
-    )
-    resp.raise_for_status()
-    return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+    last_err = None
+    for model in GEMINI_MODELS:
+        resp = requests.post(
+            GEMINI_URL_TMPL.format(model=model),
+            params={"key": api_key},
+            json={"contents": [{"parts": [{"text": prompt}]}]},
+            timeout=30,
+        )
+        if resp.ok:
+            return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
+        # keep the most informative error and try the next model name
+        last_err = f"HTTP {resp.status_code} on {model}: {resp.text[:200]}"
+    raise RuntimeError(last_err)
 
 def analyse(zone: str, complaint: str, api_key: str | None) -> tuple[str, str]:
     """Returns (mode_label, answer). Falls back to rules if no key or API error."""
@@ -90,6 +98,6 @@ def analyse(zone: str, complaint: str, api_key: str | None) -> tuple[str, str]:
         try:
             return "Gemini AI analysis (grounded in survey data)", llm_analysis(zone, complaint, api_key)
         except Exception as e:
-            return (f"Rule-based fallback (AI call failed: {type(e).__name__})",
+            return (f"Rule-based fallback (AI call failed: {e})",
                     rule_based(zone, complaint))
-    return "Rule-based prototype logic (no API key provided)", rule_based(zone, complaint)
+    return "Rule-based fallback (AI call failed)" if False else ("Rule-based prototype logic (no API key provided)", rule_based(zone, complaint))
