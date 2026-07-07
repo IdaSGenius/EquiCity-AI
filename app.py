@@ -1,29 +1,42 @@
+# app.py — EquiCity AI (English UI, optional LLM analysis, integrated map)
+# Structure: complaint analysis (top) -> willingness dashboard (bottom).
+# The API key is entered in the sidebar at runtime and is NEVER stored
+# in this file or committed to GitHub.
+
 import streamlit as st
-import time
+from ai_engine import analyse
+from map_view import render_map
 
-st.set_page_config(page_title="EquiCity AI", page_icon="🏙️")
+st.set_page_config(page_title="EquiCity AI", page_icon="\U0001F3D9")
 
-st.title("🏙️ EquiCity AI - Iskandar Puteri")
+st.title("\U0001F3D9 EquiCity AI — Iskandar Puteri")
 st.markdown("### *Bridging the Digital Façade for Urban Justice*")
 
-zone = st.selectbox("Pilih Lokasi:", ["Medini (Core)", "Skudai / Gelang Patah (Periphery)"])
-user_input = st.text_area("Masukkan aduan anda:")
+# --- Sidebar: optional AI key (free key from Google AI Studio) ---
+with st.sidebar:
+    st.markdown("**AI mode (optional)**")
+    api_key = st.text_input("Gemini API key", type="password",
+                            help="Leave empty to use transparent rule-based logic.")
+    st.caption("Without a key, EquiCity runs its rule-based prototype logic. "
+               "With a key, complaints are analysed by Gemini, grounded in the "
+               "doctoral survey data below.")
 
-if st.button("Hantar ke EquiCity AI"):
-    if user_input:
-        # FAKE LOADING: Lakonan supaya nampak macam AI tengah berfikir
-        with st.spinner("Menganalisis aduan berdasarkan Spatial Justice..."):
-            time.sleep(2) 
-            
-            st.subheader("Respon Pakar Bandar:")
-            
-            # LOGIK HARDCODE BERDASARKAN PHD AWAK
-            if "Periphery" in zone:
-                st.write(f"Menganalisis aduan '{user_input}' untuk kawasan **Skudai / Gelang Patah (Periphery)**.\n\nBerdasarkan prinsip *Infrastructural Justice*, cadangan peruntukan untuk aplikasi pintar **MESTI DITANGGUHKAN**. Keutamaan pihak kerajaan mesti memfokuskan kepada pembaikan infrastruktur asas terlebih dahulu seperti menurap jalan dan membaiki sistem bas. Rakyat tidak mahukan 'digital façade'; mereka mahukan hak asas yang berfungsi.")
-            else:
-                st.write(f"Menganalisis aduan '{user_input}' untuk kawasan **Medini (Core)**.\n\nMemandangkan infrastruktur asas di kawasan ini sudah matang, EquiCity AI mencadangkan pelaksanaan pengoptimuman bandar pintar tahap tinggi seperti **Sistem Parkir AI** dan **Pemantauan Keselamatan IoT**.")
-                
-            st.divider()
-            st.caption("Berdasarkan Framework PhD: Just Smart Mobility (Bakhtiar et al., 2026)")
+# --- Complaint analysis ---
+zone = st.selectbox("Select zone:", ["Medini (Core)", "Skudai / Gelang Patah (Periphery)"])
+complaint = st.text_area("Describe the issue (e.g., potholes, unreliable buses, streetlights):")
+
+if st.button("Analyse with EquiCity AI"):
+    if complaint.strip():
+        with st.spinner("Analysing complaint against the Just Smart Mobility framework..."):
+            mode, answer = analyse(zone, complaint, api_key or None)
+        st.subheader("Recommendation")
+        st.caption(f"Mode: {mode}")
+        st.write(answer)
+        st.divider()
+        st.caption("Framework: Just Smart Mobility (doctoral research, UTM, 2026)")
     else:
-        st.warning("Sila tulis sesuatu dalam kotak aduan.")
+        st.warning("Please describe the issue first.")
+
+# --- Willingness dashboard (real survey data, N=734) ---
+st.divider()
+render_map()
