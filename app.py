@@ -3,9 +3,8 @@
 # The API key is entered in the sidebar at runtime and is NEVER stored
 # in this file or committed to GitHub.
 import streamlit as st
-from ai_engine import analyse
+from ai_engine import analyse, STUDY_ZONES
 from map_view import render_map
-from mbip_layers import available_zones
 
 st.set_page_config(page_title="EquiCity AI", page_icon="\U0001F3D9")
 st.title("\U0001F3D9 EquiCity AI — Iskandar Puteri")
@@ -21,7 +20,7 @@ with st.sidebar:
                "doctoral survey data below.")
 
 # --- Complaint analysis ---
-zone = st.selectbox("Select mukim:", available_zones())
+zone = st.selectbox("Select zone:", STUDY_ZONES)
 complaint = st.text_area("Describe the issue (e.g., potholes, drainage/flooding, "
                           "park maintenance, unreliable buses, unsafe walkways, "
                           "land-use conflicts, waste collection):")
