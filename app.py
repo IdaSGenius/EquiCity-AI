@@ -13,14 +13,8 @@ st.markdown("### *Bridging the Digital Façade for Urban Justice*")
 # --- Sidebar: optional AI key (free key from Google AI Studio) ---
 with st.sidebar:
     st.markdown("**AI mode (optional)**")
-    api_key = st.text_input("Gemini API key", type="AIzaSyDsqwbVOLRWG12Gr8aJcPNiIMIH4P8Acmg",
+    api_key = st.text_input("Gemini API key", type="password",
                             help="Leave empty to use transparent rule-based logic.")
-    if not api_key:
-        # Falls back to a key stored in Streamlit Cloud's Secrets vault
-        # (Settings -> Secrets), so the demo runs in AI mode automatically
-        # without anyone needing to paste a key in. Never stored in this
-        # file or committed to GitHub.
-        api_key = st.secrets.get("GEMINI_API_KEY", None)
     st.caption("Without a key, EquiCity runs its rule-based prototype logic. "
                "With a key, complaints are analysed by Gemini, grounded in the "
                "doctoral survey data below.")
