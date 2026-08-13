@@ -25,9 +25,13 @@ import json
 import pandas as pd
 import requests
 
-# Candidate model names, tried in order. Google retires model names over
-# time, so if all fail, check current names at ai.google.dev and edit this list.
-GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+# Candidate model names, tried in order. Verified against Google's own
+# release notes on 14 Aug 2026: 1.5-flash and 2.0-flash are retired;
+# 3.6-flash and 3.5-flash-lite are the current GA models; 2.5-flash still
+# works but is scheduled to shut down 16 Oct 2026. Google retires model
+# names over time — if all of these fail, check ai.google.dev for the
+# current list and edit this array.
+GEMINI_MODELS = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-3.5-flash-lite"]
 GEMINI_URL_TMPL = ("https://generativelanguage.googleapis.com/v1beta/models/"
                    "{model}:generateContent")
 
@@ -188,8 +192,11 @@ Do not cite any number, date, or statistic not given to you in this prompt."""
         )
         if resp.ok:
             return resp.json()["candidates"][0]["content"]["parts"][0]["text"]
-        # keep the most informative error and try the next model name
-        last_err = f"HTTP {resp.status_code} on {model}: {resp.text[:200]}"
+        # collect every attempt's error, not just the last — a single
+        # cherry-picked error can hide the real problem (e.g. wrong key,
+        # billing not set up, or a genuinely retired model name)
+        attempt = f"{model}: HTTP {resp.status_code} — {resp.text[:150]}"
+        last_err = attempt if last_err is None else f"{last_err} | {attempt}"
     raise RuntimeError(last_err)
 
 
