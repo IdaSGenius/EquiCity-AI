@@ -31,6 +31,19 @@ GEMINI_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 GEMINI_URL_TMPL = ("https://generativelanguage.googleapis.com/v1beta/models/"
                    "{model}:generateContent")
 
+# EquiCity AI's actual study-area zones (Just Smart Mobility framework,
+# doctoral research) — these are the real units the survey was built
+# around. NOT the same as official government mukim boundaries, which
+# include neighbouring local authorities (Kulai, Senai) outside MBIP.
+STUDY_ZONES = ["Medini", "Skudai", "Gelang Patah", "Tanjung Kupang / Tanjung Pelepas"]
+
+
+def _normalize(name: str) -> str:
+    """Case/punctuation-tolerant key for matching zone names against
+    survey data — e.g. 'Tanjung Kupang / Tanjung Pelepas' vs whatever
+    exact spelling the geojson uses."""
+    return " ".join(str(name).strip().upper().replace("/", " ").split())
+
 
 def survey_context() -> str:
     """Build a short factual context block from the real survey data,
@@ -52,28 +65,43 @@ def survey_context() -> str:
 
 
 def _mukim_stats():
-    """Load per-mukim survey stats keyed by uppercase mukim name (robust
-    to case differences between the survey file and the zone dropdown),
-    plus the citywide average participation rate."""
+    """Load per-mukim survey stats keyed by a normalized zone name
+    (tolerant of case/punctuation differences), plus the citywide
+    average participation rate."""
     with open("data/mukim_willingness.geojson") as f:
         gj = json.load(f)
     stats, values = {}, []
     for feat in gj["features"]:
         p = feat["properties"]
         if p.get("n_participate"):
-            stats[str(p["MUKIM"]).strip().upper()] = p
+            stats[_normalize(p["MUKIM"])] = p
             if p.get("pct_participate") is not None:
                 values.append(p["pct_participate"])
     citywide_avg = sum(values) / len(values) if values else None
     return stats, citywide_avg
 
 
+def _find_stats(stats: dict, zone: str):
+    """Match a zone name against survey MUKIM keys. Tries an exact
+    normalized match first, then falls back to substring matching so
+    e.g. 'Tanjung Kupang / Tanjung Pelepas' still finds a record filed
+    under just 'Tanjung Kupang'. Confirm your geojson's exact MUKIM
+    values match STUDY_ZONES if this fallback keeps firing."""
+    key = _normalize(zone)
+    if key in stats:
+        return stats[key]
+    for k, v in stats.items():
+        if k in key or key in k:
+            return v
+    return None
+
+
 def rule_based(zone: str, complaint: str) -> str:
-    """Transparent rule-based prototype logic. Compares this mukim's real
+    """Transparent rule-based prototype logic. Compares this zone's real
     survey participation rate to the citywide average — no invented
-    Core/Periphery label, so it works for any mukim in the dropdown."""
+    Core/Periphery label."""
     stats, citywide_avg = _mukim_stats()
-    p = stats.get(zone.strip().upper())
+    p = _find_stats(stats, zone)
 
     if not p or citywide_avg is None:
         return (f"**Rule-based recommendation (prototype).** Complaint: '{complaint}' "
@@ -103,7 +131,7 @@ def rule_based(zone: str, complaint: str) -> str:
 def llm_analysis(zone: str, complaint: str, api_key: str) -> str:
     """Ask Gemini for an equity-weighted analysis, grounded in survey data."""
     stats, _ = _mukim_stats()
-    p = stats.get(zone.strip().upper())
+    p = _find_stats(stats, zone)
     zone_line = (
         f"This zone (mukim {zone}): participate {p.get('pct_participate')}%, "
         f"attend meetings {p.get('pct_attend')}%, volunteer {p.get('pct_volunteer')}%, "
