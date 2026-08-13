@@ -2,13 +2,12 @@
 # Structure: complaint analysis (top) -> willingness dashboard (bottom).
 # The API key is entered in the sidebar at runtime and is NEVER stored
 # in this file or committed to GitHub.
-
 import streamlit as st
 from ai_engine import analyse
 from map_view import render_map
+from mbip_layers import available_zones
 
 st.set_page_config(page_title="EquiCity AI", page_icon="\U0001F3D9")
-
 st.title("\U0001F3D9 EquiCity AI — Iskandar Puteri")
 st.markdown("### *Bridging the Digital Façade for Urban Justice*")
 
@@ -22,8 +21,10 @@ with st.sidebar:
                "doctoral survey data below.")
 
 # --- Complaint analysis ---
-zone = st.selectbox("Select zone:", ["Medini (Core)", "Skudai / Gelang Patah (Periphery)"])
-complaint = st.text_area("Describe the issue (e.g., potholes, unreliable buses, streetlights):")
+zone = st.selectbox("Select mukim:", available_zones())
+complaint = st.text_area("Describe the issue (e.g., potholes, drainage/flooding, "
+                          "park maintenance, unreliable buses, unsafe walkways, "
+                          "land-use conflicts, waste collection):")
 
 if st.button("Analyse with EquiCity AI"):
     if complaint.strip():
@@ -40,6 +41,7 @@ if st.button("Analyse with EquiCity AI"):
 # --- Willingness dashboard (real survey data, N=734) ---
 st.divider()
 render_map()
+
 # --- Official MBIP OneMap boundary layers (added for MJIIX 2026) ---
 import pydeck as pdk
 from mbip_layers import get_boundary_geojson
@@ -69,7 +71,6 @@ try:
             get_line_color=[0, 200, 255, 200],
             line_width_min_pixels=2,
         ))
-
     if mbip_layers_list:
         st.pydeck_chart(pdk.Deck(
             layers=mbip_layers_list,
@@ -80,4 +81,3 @@ try:
         ))
 except Exception as e:
     st.warning(f"MBIP OneMap layer unavailable right now: {e}")
-
