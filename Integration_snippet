@@ -1,0 +1,71 @@
+# ============================================================
+# Add to your existing app (e.g. app.py) — three pieces.
+# Assumes your current pydeck choropleth code already exists.
+# ============================================================
+
+from mbip_layers import (landuse_by_mukim, boundary_pydeck_layer,
+                         get_parcels, get_boundary_geojson)
+
+# ---- 1) Sidebar: official-layer toggles -------------------------------
+st.sidebar.subheader("Official MBIP layers (OneMap)")
+show_warta = st.sidebar.checkbox("MBIP gazetted boundary", value=True)
+show_zonam = st.sidebar.checkbox("Councillor zones (Zon Ahli Majlis)")
+show_taman = st.sidebar.checkbox("Neighbourhood boundaries (Taman)")
+
+extra_layers = []
+try:
+    if show_warta:
+        extra_layers.append(boundary_pydeck_layer("sempadan_mbip",
+                            rgba=(255, 215, 0, 230), width=3))
+    if show_zonam:
+        extra_layers.append(boundary_pydeck_layer("zon_ahli_majlis",
+                            rgba=(0, 200, 255, 200), width=2))
+    if show_taman:
+        extra_layers.append(boundary_pydeck_layer("sempadan_taman",
+                            rgba=(255, 255, 255, 120), width=1))
+except RuntimeError as e:
+    st.sidebar.warning(f"MBIP OneMap layer unavailable: {e}")
+
+# then append extra_layers to the layers list you already pass to pdk.Deck:
+# deck = pdk.Deck(layers=[your_choropleth_layer, *extra_layers], ...)
+
+# ---- 2) New tab: survey x official land use cross-analysis ------------
+# This is the analytical novelty: community willingness (your N=734
+# survey) against MBIP's official land-use composition per mukim.
+tab_landuse = st.tabs(["Land use × Community willingness"])[0]  # or add
+                                                                # to your
+                                                                # existing
+                                                                # st.tabs()
+with tab_landuse:
+    st.caption("Land-use composition: MBIP OneMap Gunatanah Semasa "
+               "(official municipal data, queried live). "
+               "Willingness scores: doctoral survey, N=734.")
+    lu = landuse_by_mukim()
+    if lu.empty:
+        st.warning("No land-use statistics returned from MBIP OneMap.")
+    else:
+        mukim = st.selectbox("Mukim", sorted(lu["mukim"].unique()))
+        sub = lu[lu["mukim"] == mukim]
+        c1, c2 = st.columns(2)
+        with c1:
+            st.bar_chart(sub.set_index("landuse")["hectares"])
+        with c2:
+            # Merge with your existing per-mukim willingness dataframe here,
+            # e.g. df_willingness[df_willingness.mukim == mukim]
+            st.dataframe(sub[["landuse", "hectares", "pct_of_mukim"]],
+                         hide_index=True)
+
+# ---- 3) Optional: show recreation/open-space parcels on demand --------
+if st.sidebar.checkbox("Show open space & recreation parcels"):
+    try:
+        parcels = get_parcels(landuse="TANAH LAPANG DAN REKREASI")
+        import pydeck as pdk
+        extra_layers.append(pdk.Layer(
+            "GeoJsonLayer", data=parcels, stroked=True, filled=True,
+            get_fill_color=[173, 255, 47, 90],
+            get_line_color=[80, 160, 40, 200],
+            pickable=True,
+        ))
+    except RuntimeError as e:
+        st.sidebar.warning(str(e))
+
