@@ -22,8 +22,9 @@ Design principles
   If MBIP restructures the service, discover_layer() re-reads metadata.
 
 Usage in your Streamlit app:
-    from mbip_layers import (landuse_by_mukim, get_boundary_geojson,
-                             boundary_pydeck_layer, MBIP_SERVICES)
+    from mbip_layers import (landuse_by_mukim, available_zones,
+                             get_boundary_geojson, boundary_pydeck_layer,
+                             MBIP_SERVICES)
 """
 
 from __future__ import annotations
@@ -127,6 +128,24 @@ def landuse_by_mukim() -> pd.DataFrame:
     return df.sort_values(["mukim", "hectares"], ascending=[True, False])
 
 
+# Verified 13 Aug 2026 by intersecting Johor_Mukim.shp against the MBIP
+# local authority boundary: Tanjung Kupang, Jelutong and Pulai are >90%
+# inside MBIP and match the mukim_id domain confirmed live on OneMap.
+# Used only if the live query below fails.
+OFFLINE_ZONE_FALLBACK = ["Jelutong", "Pulai", "Tanjung Kupang"]
+
+
+@_cache
+def available_zones() -> list[str]:
+    """Canonical zone list for the UI: real mukim names inside MBIP
+    jurisdiction, discovered live from the Gunatanah Semasa layer, with
+    a verified offline fallback if the government server is unreachable."""
+    df = landuse_by_mukim()
+    if not df.empty:
+        return sorted(df["mukim"].unique().tolist())
+    return OFFLINE_ZONE_FALLBACK
+
+
 # ------------------------------------------------- 2) boundary GeoJSON
 def _snapshot_path(name: str) -> Path:
     return SNAPSHOT_DIR / f"{name}.geojson"
@@ -158,9 +177,13 @@ def get_boundary_geojson(name: str, out_fields: str = "*") -> dict:
                 break
             offset += 1000
         gj = {"type": "FeatureCollection", "features": features}
-        # refresh snapshot for offline fallback
-        SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
-        _snapshot_path(name).write_text(json.dumps(gj))
+        # refresh snapshot for offline fallback (best-effort: some hosts,
+        # e.g. Streamlit Cloud, may have a read-only filesystem)
+        try:
+            SNAPSHOT_DIR.mkdir(parents=True, exist_ok=True)
+            _snapshot_path(name).write_text(json.dumps(gj))
+        except OSError:
+            pass
         return gj
     except Exception as exc:
         snap = _snapshot_path(name)
@@ -238,4 +261,3 @@ if __name__ == "__main__":
         print(f"landuse_by_mukim: {len(df)} rows -> landuse_by_mukim.csv")
     else:
         print(landuse_by_mukim().head(20).to_string())
-
