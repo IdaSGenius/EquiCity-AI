@@ -142,7 +142,10 @@ def available_zones() -> list[str]:
     a verified offline fallback if the government server is unreachable."""
     df = landuse_by_mukim()
     if not df.empty:
-        return sorted(df["mukim"].unique().tolist())
+        names = df["mukim"].dropna().astype(str).str.strip()
+        names = sorted({n for n in names if n})
+        if names:
+            return names
     return OFFLINE_ZONE_FALLBACK
 
 
